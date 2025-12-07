@@ -6,7 +6,7 @@ let centers = [];
 let textContent = "A";
 
 // 텍스트 레이아웃 컨트롤
-let textSizeVal = 800;
+let textSizeVal = 600;
 let letterSpacingVal = 40;
 let lineLeadingVal = 80;
 
@@ -497,7 +497,7 @@ function draw() {
   // ===== 필터 적용 (전체 그린 뒤) =====
   if (blurOn) {
     // 살짝만 번지는 느낌
-    filter(BLUR, 2);
+    filter(BLUR, .7);
   }
 
   if (noiseOn) {
@@ -515,7 +515,7 @@ function addNoiseOverlay() {
 
   // 🔥 노이즈 양 크게 올림
   // 숫자 작을수록 → 더 많은 점
-  let grainCount = (width * height) / 50;  
+  let grainCount = (width * height) / 40;  
   grainCount = constrain(grainCount, 15000, 60000);
 
   for (let i = 0; i < grainCount; i++) {
@@ -523,7 +523,7 @@ function addNoiseOverlay() {
     let y = random(height);
 
     // 밝기 범위 더 넓게, 어두운 점도 섞이게
-    let v = random(80, 255);
+    let v = random(40, 220);
 
     // 🔥 투명도도 올림 (18 → 45 정도)
     stroke(v, 45);
