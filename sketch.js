@@ -6,7 +6,7 @@ let centers = [];
 let textContent = "A";
 
 // 텍스트 레이아웃 컨트롤
-let textSizeVal = 600;
+let textSizeVal = 800;
 let letterSpacingVal = 40;
 let lineLeadingVal = 80;
 
@@ -37,6 +37,9 @@ let colorPalette = "Black";
 let perCharColor = false;
 let shapeMode = "Circle";
 let drawMode = "Stroke";
+
+// 🔹 전체 컬러 오퍼시티
+let rippleAlpha = 255; // 0~255
 
 // 블렌딩 모드
 let blendModeName = "Normal"; // Normal / Add / Multiply / Screen / Lightest / Darkest
@@ -73,6 +76,7 @@ let arcSpanRow;
 let radiusMinRow, radiusMaxRow, stepRow, spacingRow;
 let strokeWRow, speedRow;
 let textSizeRow, letterSpacingRow, leadingRow;
+let alphaRow;
 
 // 기타 컨트롤
 let paletteSelect;
@@ -142,7 +146,7 @@ function setup() {
   layoutBodyDiv.parent(panelDiv);
   layoutBodyDiv.style("margin-top", "8px");
 
-  // 🔤 텍스트 입력창 (섹션 안, Size 위)
+  // 🔤 텍스트 입력창
   let textRow = createDiv();
   textRow.parent(layoutBodyDiv);
   textRow.style("margin-bottom", "8px");
@@ -150,11 +154,10 @@ function setup() {
   textArea = createElement('textarea', textContent);
   textArea.parent(textRow);
   textArea.style("width", "100%");
-  textArea.style("height", "26px"); // 여기 숫자로 높이 조절 가능
+  textArea.style("height", "26px");
   textArea.style("font-size", "11px");
   textArea.style("resize", "vertical");
 
-  // 입력 즉시 반영
   textArea.input(() => {
     textContent = textArea.value();
     buildAllText();
@@ -165,7 +168,7 @@ function setup() {
     "Size",
     50, 800,
     textSizeVal,
-    (v) => { textSizeVal = v; },
+    v => { textSizeVal = v; },
     layoutBodyDiv
   );
 
@@ -173,7 +176,7 @@ function setup() {
     "Tracking",
     -200, 200,
     letterSpacingVal,
-    (v) => { letterSpacingVal = v; },
+    v => { letterSpacingVal = v; },
     layoutBodyDiv
   );
 
@@ -181,7 +184,7 @@ function setup() {
     "Leading",
     0, 250,
     lineLeadingVal,
-    (v) => { lineLeadingVal = v; },
+    v => { lineLeadingVal = v; },
     layoutBodyDiv
   );
 
@@ -236,6 +239,15 @@ function setup() {
   stepRow      = createSliderRow("Step", 5, 80, step, v => step = v, styleBodyDiv);
   spacingRow   = createSliderRow("Point", 20, 200, spacing, v => spacing = v, styleBodyDiv);
   strokeWRow   = createSliderRow("Stroke", 0.5, 8, strokeW, v => strokeW = v, styleBodyDiv);
+
+  // 🔹 Alpha 슬라이더
+  alphaRow = createSliderRow(
+    "Alpha",
+    0, 255,
+    rippleAlpha,
+    v => rippleAlpha = v,
+    styleBodyDiv
+  );
 
   speedRow = createSliderRow(
     "Speed",
@@ -305,7 +317,7 @@ function setup() {
   paletteSelect.value(colorPalette);
   paletteSelect.changed(() => colorPalette = paletteSelect.value());
 
-  // 🔘 Filter 체크 (Blur / Noise) — Color 밑에
+  // 🔘 Filter 체크 (Blur / Noise)
   let filterRow = createDiv();
   filterRow.parent(styleBodyDiv);
   filterRow.style("margin-top", "4px");
@@ -315,7 +327,6 @@ function setup() {
   filterLabel.style("width", "70px");
   filterLabel.style("display", "inline-block");
 
-  // Blur 체크박스
   blurCheckbox = createCheckbox('Blur', blurOn);
   blurCheckbox.parent(filterRow);
   blurCheckbox.style("margin-right", "8px");
@@ -323,7 +334,6 @@ function setup() {
     blurOn = blurCheckbox.checked();
   });
 
-  // Noise 체크박스
   noiseCheckbox = createCheckbox('Noise', noiseOn);
   noiseCheckbox.parent(filterRow);
   noiseCheckbox.changed(() => {
@@ -445,12 +455,32 @@ function setup() {
   buildAllText();
 }
 
+// ===== 메인 draw 루프 =====
 function draw() {
-  // 먼저 기본 블렌드로 초기화
-  blendMode(BLEND);
-  background(bgColor);
+  // 화면 렌더링
+  renderScene(bgColor);
 
-  // 선택된 블렌드 모드 적용
+  // Blur / Noise 필터는 화면에만 적용
+  if (blurOn) {
+    filter(BLUR, 0.7);
+  }
+  if (noiseOn) {
+    addNoiseOverlay();
+  }
+
+  // 애니메이션 업데이트
+  updateAnimation();
+
+  if (timelineSlider) {
+    timelineSlider.value(rippleProgress);
+  }
+}
+
+// ===== 실제 그리기 로직 =====
+function renderScene(bgCol) {
+  blendMode(BLEND);
+  background(bgCol);
+
   let modeConst = BLEND;
   if (blendModeName === "Add")      modeConst = ADD;
   else if (blendModeName === "Multiply") modeConst = MULTIPLY;
@@ -464,8 +494,10 @@ function draw() {
   for (let c of centers) {
     drawRipple(c, eased);
   }
+}
 
-  // 애니메이션 모드
+// ===== 애니메이션 업데이트 =====
+function updateAnimation() {
   if (animMode === "Manual") {
     if (animating) {
       rippleProgress += rippleSpeed;
@@ -491,41 +523,22 @@ function draw() {
       }
     }
   }
-
-  if (timelineSlider) timelineSlider.value(rippleProgress);
-
-  // ===== 필터 적용 (전체 그린 뒤) =====
-  if (blurOn) {
-    // 살짝만 번지는 느낌
-    filter(BLUR, .7);
-  }
-
-  if (noiseOn) {
-    addNoiseOverlay();
-  }
 }
 
-// ===== 노이즈 오버레이 (필름 그레인 느낌) =====
+// ===== 노이즈 오버레이 =====
 function addNoiseOverlay() {
   push();
-  // 노이즈는 그냥 위에 입히는 느낌이라 기본 블렌드로
   blendMode(BLEND);
   noFill();
   strokeWeight(1);
 
-  // 🔥 노이즈 양 크게 올림
-  // 숫자 작을수록 → 더 많은 점
-  let grainCount = (width * height) / 40;  
+  let grainCount = (width * height) / 40;
   grainCount = constrain(grainCount, 15000, 60000);
 
   for (let i = 0; i < grainCount; i++) {
     let x = random(width);
     let y = random(height);
-
-    // 밝기 범위 더 넓게, 어두운 점도 섞이게
     let v = random(40, 220);
-
-    // 🔥 투명도도 올림 (18 → 45 정도)
     stroke(v, 45);
     point(x, y);
   }
@@ -555,7 +568,7 @@ function createSliderRow(labelText, min, max, initialValue, onChange, parentDiv,
   slider.parent(row);
   slider.style("width", "100px");
   slider.style("margin", "0 6px");
-  slider.elt.style.accentColor = "#555555"; // 다크 그레이 슬라이더
+  slider.elt.style.accentColor = "#555555";
 
   let numberInput = createInput(initialValue.toString());
   numberInput.parent(row);
@@ -590,7 +603,7 @@ function buildAllText() {
   centerAlignCenters();
 }
 
-// 블록 레이아웃
+// 🔧 블록 레이아웃 (글자별 로컬 그리드)
 function buildBlockText() {
   let fontSize = textSizeVal;
   let lines = textContent.toUpperCase().split("\n");
@@ -613,10 +626,15 @@ function buildBlockText() {
       let info = getGlyphPoints(ch, fontSize);
       if (!info) continue;
 
+      // 이 글자의 로컬 기준점
+      let originX = cursorX;
+      let originY = cursorY;
+
       for (let p of info.pts) {
         let gx = p.x + cursorX;
         let gy = p.y + cursorY;
-        addSnappedPoint(allCenters, gx, gy, glyphCounter);
+
+        addSnappedPoint(allCenters, gx, gy, glyphCounter, originX, originY);
       }
 
       cursorX += info.width + letterSpacingVal;
@@ -627,7 +645,7 @@ function buildBlockText() {
   centers = allCenters;
 }
 
-// 원형 / 아치 레이아웃
+// 🔧 원형 / 아치 레이아웃 (글자별 로컬 그리드)
 function buildRadialText() {
   let fontSize = textSizeVal;
   let textFlat = textContent.toUpperCase().replace(/\n/g, " ");
@@ -671,10 +689,15 @@ function buildRadialText() {
       continue;
     }
 
+    // 이 글자의 로컬 기준점
+    let originX = baseX;
+    let originY = baseY;
+
     for (let p of info.pts) {
       let gx = baseX + p.x;
       let gy = baseY + p.y;
-      addSnappedPoint(allCenters, gx, gy, glyphCounter);
+
+      addSnappedPoint(allCenters, gx, gy, glyphCounter, originX, originY);
     }
 
     glyphCounter++;
@@ -683,13 +706,25 @@ function buildRadialText() {
   centers = allCenters;
 }
 
-// 스냅 + 중복 제거 + gIndex 지정
-function addSnappedPoint(allCenters, gx, gy, gIndex) {
-  let sx = Math.round(gx / spacing) * spacing;
-  let sy = Math.round(gy / spacing) * spacing;
+// 🔧 스냅 + 중복 제거 + gIndex 지정 (글자별 로컬 그리드)
+function addSnappedPoint(allCenters, gx, gy, gIndex, originX, originY) {
+  // 1) 글자 기준 좌표계로 변환
+  let localX = gx - originX;
+  let localY = gy - originY;
 
+  // 2) 로컬 좌표에서 스냅
+  let snappedLocalX = Math.round(localX / spacing) * spacing;
+  let snappedLocalY = Math.round(localY / spacing) * spacing;
+
+  // 3) 다시 월드 좌표로 되돌리기
+  let sx = snappedLocalX + originX;
+  let sy = snappedLocalY + originY;
+
+  // 같은 글자 안에서만 중복 제거
   for (let q of allCenters) {
-    if (dist(sx, sy, q.x, q.y) < spacing * 0.4) return;
+    if (q.gIndex === gIndex && dist(sx, sy, q.x, q.y) < spacing * 0.4) {
+      return;
+    }
   }
 
   let v = createVector(sx, sy);
@@ -750,9 +785,8 @@ function drawRipple(pt, progress) {
     if (!visible) continue;
 
     let col = getColorForRipple(t, r, gIndex);
-    let alpha = 140;
+    let alpha = rippleAlpha;
 
-    // LineX / LineY는 항상 stroke
     let forceStroke = (shapeMode === "LineX" || shapeMode === "LineY");
 
     if (drawMode === "Fill" && !forceStroke) {
@@ -885,7 +919,34 @@ function keyPressed() {
   }
 }
 
-// ===== Export =====
+// ===== Export (투명 배경으로 타입만) =====
 function exportPNG() {
+  let prevBg = bgColor;
+
+  clear();
+
+  let modeConst = BLEND;
+  if (blendModeName === "Add")      modeConst = ADD;
+  else if (blendModeName === "Multiply") modeConst = MULTIPLY;
+  else if (blendModeName === "Screen")   modeConst = SCREEN;
+  else if (blendModeName === "Lightest") modeConst = LIGHTEST;
+  else if (blendModeName === "Darkest")  modeConst = DARKEST;
+  blendMode(modeConst);
+
+  let eased = applyEasing(rippleProgress, easingMode);
+  for (let c of centers) {
+    drawRipple(c, eased);
+  }
+
+  if (blurOn) {
+    filter(BLUR, 0.7);
+  }
+  if (noiseOn) {
+    addNoiseOverlay();
+  }
+
   saveCanvas(canvas, "type_ripple", "png");
+
+  // 화면 복구
+  renderScene(prevBg);
 }
