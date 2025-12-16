@@ -1,3 +1,4 @@
+
 // ===== 공통 설정 =====
 let font;
 let centers = [];
@@ -89,6 +90,25 @@ let drawModeSelect;
 let blendModeSelect;
 let timelineSlider;
 
+// ===== Auto scale (Size 줄일 때 세팅 자동 리스케일) =====
+const BASE_SIZE = 800;
+const BASE_RADIUS_MIN = 13;
+const BASE_RADIUS_MAX = 90;
+const BASE_STEP = 20;
+const BASE_SPACING = 70;
+const BASE_STROKEW = 1.5;
+
+// ✅ Tracking/Leading도 autoscale 기준값으로 고정
+const BASE_TRACKING = 40;
+const BASE_LEADING = 80;
+
+let autoScaleOn = true;
+let autoScaleCheckbox;
+
+// ✅ autoscale이 tracking/leading까지 건드릴 때, 사용자가 수동 조절한 값을 기억하기 위한 플래그
+let userTouchedTracking = false;
+let userTouchedLeading = false;
+
 function preload() {
   font = loadFont('Montserrat-VariableFont_wght.ttf');
 }
@@ -163,30 +183,72 @@ function setup() {
     buildAllText();
   });
 
-  // 사이즈 / 트래킹 / 리딩
+  // 사이즈
   textSizeRow = createSliderRow(
     "Size",
     50, 800,
     textSizeVal,
-    v => { textSizeVal = v; },
+    v => {
+      textSizeVal = v;
+      if (autoScaleOn) autoScaleByTextSize();
+    },
     layoutBodyDiv
   );
 
+  // Size 슬라이더 input 보강
+  textSizeRow.slider.input(() => {
+    textSizeVal = textSizeRow.slider.value();
+    textSizeRow.numberInput.value(textSizeVal);
+    if (autoScaleOn) autoScaleByTextSize();
+    buildAllText();
+  });
+
+  // 트래킹
   letterSpacingRow = createSliderRow(
     "Tracking",
     -200, 200,
     letterSpacingVal,
-    v => { letterSpacingVal = v; },
+    v => {
+      letterSpacingVal = v;
+      userTouchedTracking = true; // ✅ 사용자가 직접 만졌다고 표시
+    },
     layoutBodyDiv
   );
 
+  // 리딩
   leadingRow = createSliderRow(
     "Leading",
     0, 250,
     lineLeadingVal,
-    v => { lineLeadingVal = v; },
+    v => {
+      lineLeadingVal = v;
+      userTouchedLeading = true; // ✅ 사용자가 직접 만졌다고 표시
+    },
     layoutBodyDiv
   );
+
+  // ✅ AutoScale 토글 UI
+  let autoRow = createDiv();
+  autoRow.parent(layoutBodyDiv);
+  autoRow.style("margin-top", "6px");
+
+  let autoLabel = createSpan("AutoScale:");
+  autoLabel.parent(autoRow);
+  autoLabel.style("width", "70px");
+  autoLabel.style("display", "inline-block");
+
+  autoScaleCheckbox = createCheckbox("", autoScaleOn);
+  autoScaleCheckbox.parent(autoRow);
+  autoScaleCheckbox.changed(() => {
+    autoScaleOn = autoScaleCheckbox.checked();
+    if (autoScaleOn) {
+      // autoscale 켜면 다시 기준 스케일 적용
+      userTouchedTracking = false;
+      userTouchedLeading = false;
+      autoScaleByTextSize();
+      buildAllText();
+    }
+  });
 
   // 레이아웃 모드
   let lmRow = createDiv();
@@ -204,7 +266,10 @@ function setup() {
   layoutSelect.option("Circle");
   layoutSelect.option("Arc");
   layoutSelect.value(layoutMode);
-  layoutSelect.changed(() => buildAllText());
+  layoutSelect.changed(() => {
+    layoutMode = layoutSelect.value();
+    buildAllText();
+  });
 
   layoutRadiusRow = createSliderRow(
     "Radius",
@@ -236,8 +301,8 @@ function setup() {
 
   radiusMinRow = createSliderRow("Min", 1, 80, radiusMin, v => radiusMin = v, styleBodyDiv);
   radiusMaxRow = createSliderRow("Max", 10, 250, radiusMax, v => radiusMax = v, styleBodyDiv);
-  stepRow      = createSliderRow("Step", 5, 80, step, v => step = v, styleBodyDiv);
-  spacingRow   = createSliderRow("Point", 20, 200, spacing, v => spacing = v, styleBodyDiv);
+  stepRow      = createSliderRow("Step", 5, 120, step, v => step = v, styleBodyDiv);
+  spacingRow   = createSliderRow("Point", 6, 250, spacing, v => spacing = v, styleBodyDiv);
   strokeWRow   = createSliderRow("Stroke", 0.5, 8, strokeW, v => strokeW = v, styleBodyDiv);
 
   // 🔹 Alpha 슬라이더
@@ -330,15 +395,11 @@ function setup() {
   blurCheckbox = createCheckbox('Blur', blurOn);
   blurCheckbox.parent(filterRow);
   blurCheckbox.style("margin-right", "8px");
-  blurCheckbox.changed(() => {
-    blurOn = blurCheckbox.checked();
-  });
+  blurCheckbox.changed(() => blurOn = blurCheckbox.checked());
 
   noiseCheckbox = createCheckbox('Noise', noiseOn);
   noiseCheckbox.parent(filterRow);
-  noiseCheckbox.changed(() => {
-    noiseOn = noiseCheckbox.checked();
-  });
+  noiseCheckbox.changed(() => noiseOn = noiseCheckbox.checked());
 
   // ===== Shape =====
   let shapeRow = createDiv();
@@ -386,9 +447,7 @@ function setup() {
   blendModeSelect.parent(blendRow);
   ["Normal","Add","Multiply","Screen","Lightest","Darkest"].forEach(m => blendModeSelect.option(m));
   blendModeSelect.value(blendModeName);
-  blendModeSelect.changed(() => {
-    blendModeName = blendModeSelect.value();
-  });
+  blendModeSelect.changed(() => blendModeName = blendModeSelect.value());
 
   // ===== BG Color =====
   let bgRow = createDiv();
@@ -451,29 +510,23 @@ function setup() {
   easingSelect.value(easingMode);
   easingSelect.changed(() => easingMode = easingSelect.value());
 
+  // ✅ 시작 시 1회 적용해서 default 형태 고정
+  if (autoScaleOn) autoScaleByTextSize();
+
   // 초기 텍스트 빌드
   buildAllText();
 }
 
 // ===== 메인 draw 루프 =====
 function draw() {
-  // 화면 렌더링
   renderScene(bgColor);
 
-  // Blur / Noise 필터는 화면에만 적용
-  if (blurOn) {
-    filter(BLUR, 0.7);
-  }
-  if (noiseOn) {
-    addNoiseOverlay();
-  }
+  if (blurOn) filter(BLUR, 0.7);
+  if (noiseOn) addNoiseOverlay();
 
-  // 애니메이션 업데이트
   updateAnimation();
 
-  if (timelineSlider) {
-    timelineSlider.value(rippleProgress);
-  }
+  if (timelineSlider) timelineSlider.value(rippleProgress);
 }
 
 // ===== 실제 그리기 로직 =====
@@ -482,18 +535,16 @@ function renderScene(bgCol) {
   background(bgCol);
 
   let modeConst = BLEND;
-  if (blendModeName === "Add")      modeConst = ADD;
+  if (blendModeName === "Add") modeConst = ADD;
   else if (blendModeName === "Multiply") modeConst = MULTIPLY;
-  else if (blendModeName === "Screen")   modeConst = SCREEN;
+  else if (blendModeName === "Screen") modeConst = SCREEN;
   else if (blendModeName === "Lightest") modeConst = LIGHTEST;
-  else if (blendModeName === "Darkest")  modeConst = DARKEST;
+  else if (blendModeName === "Darkest") modeConst = DARKEST;
   blendMode(modeConst);
 
   let eased = applyEasing(rippleProgress, easingMode);
 
-  for (let c of centers) {
-    drawRipple(c, eased);
-  }
+  for (let c of centers) drawRipple(c, eased);
 }
 
 // ===== 애니메이션 업데이트 =====
@@ -542,7 +593,6 @@ function addNoiseOverlay() {
     stroke(v, 45);
     point(x, y);
   }
-
   pop();
 }
 
@@ -595,6 +645,33 @@ function createSliderRow(labelText, min, max, initialValue, onChange, parentDiv,
   return { slider, numberInput };
 }
 
+// ===== Size 기반 자동 리스케일 (✅ Tracking 깨짐 해결 버전) =====
+function autoScaleByTextSize() {
+  let s = textSizeVal / BASE_SIZE;
+
+  radiusMin = max(1, round(BASE_RADIUS_MIN * s));
+  radiusMax = max(radiusMin + 2, round(BASE_RADIUS_MAX * s));
+  step      = max(2, round(BASE_STEP * s));
+  spacing   = max(6, round(BASE_SPACING * s));
+  strokeW   = max(0.5, BASE_STROKEW * s);
+
+  // ✅ autoscale ON일 때: tracking/leading도 같이 비율로 따라가게
+  // (단, 사용자가 Tracking/Leading 슬라이더를 직접 만졌으면 그 값은 존중)
+  if (!userTouchedTracking) letterSpacingVal = round(BASE_TRACKING * s);
+  if (!userTouchedLeading)  lineLeadingVal   = round(BASE_LEADING * s);
+
+  // UI 반영
+  if (radiusMinRow) { radiusMinRow.slider.value(radiusMin); radiusMinRow.numberInput.value(radiusMin); }
+  if (radiusMaxRow) { radiusMaxRow.slider.value(radiusMax); radiusMaxRow.numberInput.value(radiusMax); }
+  if (stepRow)      { stepRow.slider.value(step);           stepRow.numberInput.value(step); }
+  if (spacingRow)   { spacingRow.slider.value(spacing);     spacingRow.numberInput.value(spacing); }
+  if (strokeWRow)   { strokeWRow.slider.value(strokeW);     strokeWRow.numberInput.value(strokeW); }
+
+  // ✅ tracking/leading UI도 같이 업데이트
+  if (letterSpacingRow) { letterSpacingRow.slider.value(letterSpacingVal); letterSpacingRow.numberInput.value(letterSpacingVal); }
+  if (leadingRow)       { leadingRow.slider.value(lineLeadingVal);         leadingRow.numberInput.value(lineLeadingVal); }
+}
+
 // ===== 텍스트 빌드 =====
 function buildAllText() {
   centers = [];
@@ -610,6 +687,10 @@ function buildBlockText() {
   let allCenters = [];
   let glyphCounter = 0;
 
+  // ✅ textWidth 안정화 (루프 밖에서 1번)
+  textFont(font);
+  textSize(fontSize);
+
   for (let li = 0; li < lines.length; li++) {
     let line = lines[li];
     let cursorX = 0;
@@ -618,41 +699,39 @@ function buildBlockText() {
     for (let i = 0; i < line.length; i++) {
       let ch = line[i];
 
+      // ✅ 스페이스도 font 기반 advance로
       if (ch === " ") {
-        cursorX += fontSize * 0.35 + letterSpacingVal;
+        cursorX += textWidth(" ") + letterSpacingVal;
+        glyphCounter++;
         continue;
       }
 
       let info = getGlyphPoints(ch, fontSize);
-      if (!info) continue;
+      if (!info) { glyphCounter++; continue; }
 
-      // 이 글자의 로컬 기준점
       let originX = cursorX;
       let originY = cursorY;
 
       for (let p of info.pts) {
         let gx = p.x + cursorX;
         let gy = p.y + cursorY;
-
         addSnappedPoint(allCenters, gx, gy, glyphCounter, originX, originY);
       }
 
-      cursorX += info.width + letterSpacingVal;
+      // advance width(textWidth) + Tracking
+      let adv = textWidth(ch);
+      cursorX += adv + letterSpacingVal;
       glyphCounter++;
     }
   }
-
   centers = allCenters;
 }
 
-// 🔧 원형 / 아치 레이아웃 (글자별 로컬 그리드)
+// 🔧 원형 / 아치 레이아웃
 function buildRadialText() {
   let fontSize = textSizeVal;
   let textFlat = textContent.toUpperCase().replace(/\n/g, " ");
-  if (!textFlat.length) {
-    centers = [];
-    return;
-  }
+  if (!textFlat.length) { centers = []; return; }
 
   let chars = textFlat.split("");
   let total = chars.length;
@@ -671,60 +750,43 @@ function buildRadialText() {
 
   for (let i = 0; i < total; i++) {
     let ch = chars[i];
-    let angle = (total === 1)
-      ? (startAngle + endAngle) / 2
-      : map(i, 0, total - 1, startAngle, endAngle);
+    let angle = (total === 1) ? (startAngle + endAngle) / 2 : map(i, 0, total - 1, startAngle, endAngle);
 
     let baseX = layoutRadius * cos(angle);
     let baseY = layoutRadius * sin(angle);
 
-    if (ch === " ") {
-      glyphCounter++;
-      continue;
-    }
+    if (ch === " ") { glyphCounter++; continue; }
 
     let info = getGlyphPoints(ch, fontSize);
-    if (!info) {
-      glyphCounter++;
-      continue;
-    }
+    if (!info) { glyphCounter++; continue; }
 
-    // 이 글자의 로컬 기준점
     let originX = baseX;
     let originY = baseY;
 
     for (let p of info.pts) {
       let gx = baseX + p.x;
       let gy = baseY + p.y;
-
       addSnappedPoint(allCenters, gx, gy, glyphCounter, originX, originY);
     }
 
     glyphCounter++;
   }
-
   centers = allCenters;
 }
 
-// 🔧 스냅 + 중복 제거 + gIndex 지정 (글자별 로컬 그리드)
+// 🔧 스냅 + 중복 제거 + gIndex 지정
 function addSnappedPoint(allCenters, gx, gy, gIndex, originX, originY) {
-  // 1) 글자 기준 좌표계로 변환
   let localX = gx - originX;
   let localY = gy - originY;
 
-  // 2) 로컬 좌표에서 스냅
   let snappedLocalX = Math.round(localX / spacing) * spacing;
   let snappedLocalY = Math.round(localY / spacing) * spacing;
 
-  // 3) 다시 월드 좌표로 되돌리기
   let sx = snappedLocalX + originX;
   let sy = snappedLocalY + originY;
 
-  // 같은 글자 안에서만 중복 제거
   for (let q of allCenters) {
-    if (q.gIndex === gIndex && dist(sx, sy, q.x, q.y) < spacing * 0.4) {
-      return;
-    }
+    if (q.gIndex === gIndex && dist(sx, sy, q.x, q.y) < spacing * 0.4) return;
   }
 
   let v = createVector(sx, sy);
@@ -732,7 +794,7 @@ function addSnappedPoint(allCenters, gx, gy, gIndex, originX, originY) {
   allCenters.push(v);
 }
 
-// 글자 하나의 점들 가져오기 (p5 font)
+// 글자 하나의 점들 (오리지널 형태 유지)
 function getGlyphPoints(ch, fontSize) {
   let bounds = font.textBounds(ch, 0, 0, fontSize);
   if (!bounds) return null;
@@ -740,14 +802,11 @@ function getGlyphPoints(ch, fontSize) {
   let x0 = -bounds.w / 2 - bounds.x;
   let y0 = bounds.h / 2 - bounds.y;
 
-  let pts = font.textToPoints(ch, x0, y0, fontSize, {
-    sampleFactor: 0.6
-  });
-
+  let pts = font.textToPoints(ch, x0, y0, fontSize, { sampleFactor: 0.6 });
   return { pts, width: bounds.w };
 }
 
-// 전체 centers를 캔버스 중앙으로 이동
+// 중앙 정렬
 function centerAlignCenters() {
   if (!centers.length) return;
 
@@ -779,9 +838,7 @@ function drawRipple(pt, progress) {
   for (let r = radiusMin; r <= radiusMax; r += step) {
     let t = (r - radiusMin) / (radiusMax - radiusMin);
 
-    let visible = (rippleDirection === "Inside-Out")
-      ? t <= progress
-      : t >= 1 - progress;
+    let visible = (rippleDirection === "Inside-Out") ? t <= progress : t >= 1 - progress;
     if (!visible) continue;
 
     let col = getColorForRipple(t, r, gIndex);
@@ -816,7 +873,7 @@ function drawRipple(pt, progress) {
   }
 }
 
-// 팔레트별 색상
+// 팔레트
 function getColorForRipple(t, r, gIndex) {
   if (perCharColor) return getPerCharColor(gIndex);
 
@@ -835,29 +892,17 @@ function getColorForRipple(t, r, gIndex) {
 
   if (colorPalette === "Neon") {
     let tt = constrain(t, 0, 1);
-    return [
-      lerp(80, 255, tt),
-      lerp(255, 40, tt),
-      lerp(200, 180, tt)
-    ];
+    return [ lerp(80, 255, tt), lerp(255, 40, tt), lerp(200, 180, tt) ];
   }
 
   if (colorPalette === "Candy") {
     let tt = constrain(t, 0, 1);
-    return [
-      lerp(255, 255, tt),
-      lerp(150, 210, tt),
-      lerp(190, 150, tt)
-    ];
+    return [ lerp(255, 255, tt), lerp(150, 210, tt), lerp(190, 150, tt) ];
   }
 
   if (colorPalette === "PastelGlow") {
     let tt = constrain(t, 0, 1);
-    return [
-      lerp(180, 240, tt),
-      lerp(200, 255, tt),
-      lerp(220, 255, tt)
-    ];
+    return [ lerp(180, 240, tt), lerp(200, 255, tt), lerp(220, 255, tt) ];
   }
 
   return [0, 0, 0];
@@ -878,12 +923,8 @@ function getPerCharColor(i) {
 // ===== Easing =====
 function applyEasing(t, mode) {
   t = constrain(t, 0, 1);
-  if (mode === "EaseInOutQuad") {
-    return t < 0.5 ? 2 * t * t : 1 - pow(-2 * t + 2, 2) / 2;
-  }
-  if (mode === "EaseOutCubic") {
-    return 1 - pow(1 - t, 3);
-  }
+  if (mode === "EaseInOutQuad") return t < 0.5 ? 2 * t * t : 1 - pow(-2 * t + 2, 2) / 2;
+  if (mode === "EaseOutCubic")  return 1 - pow(1 - t, 3);
   return t;
 }
 
@@ -926,27 +967,27 @@ function exportPNG() {
   clear();
 
   let modeConst = BLEND;
-  if (blendModeName === "Add")      modeConst = ADD;
+  if (blendModeName === "Add") modeConst = ADD;
   else if (blendModeName === "Multiply") modeConst = MULTIPLY;
-  else if (blendModeName === "Screen")   modeConst = SCREEN;
+  else if (blendModeName === "Screen") modeConst = SCREEN;
   else if (blendModeName === "Lightest") modeConst = LIGHTEST;
-  else if (blendModeName === "Darkest")  modeConst = DARKEST;
+  else if (blendModeName === "Darkest") modeConst = DARKEST;
   blendMode(modeConst);
 
   let eased = applyEasing(rippleProgress, easingMode);
-  for (let c of centers) {
-    drawRipple(c, eased);
-  }
+  for (let c of centers) drawRipple(c, eased);
 
-  if (blurOn) {
-    filter(BLUR, 0.7);
-  }
-  if (noiseOn) {
-    addNoiseOverlay();
-  }
+  if (blurOn) filter(BLUR, 0.7);
+  if (noiseOn) addNoiseOverlay();
 
   saveCanvas(canvas, "type_ripple", "png");
 
-  // 화면 복구
   renderScene(prevBg);
+}
+
+// ===== 리사이즈 대응 =====
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  panelDiv.size(260, windowHeight - 50);
+  buildAllText();
 }
