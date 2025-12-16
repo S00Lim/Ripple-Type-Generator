@@ -186,7 +186,7 @@ function setup() {
   // 사이즈
   textSizeRow = createSliderRow(
     "Size",
-    50, 800,
+    50, 1200,
     textSizeVal,
     v => {
       textSizeVal = v;
