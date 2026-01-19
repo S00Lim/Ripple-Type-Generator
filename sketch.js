@@ -1,5 +1,3 @@
-
-// ===== 공통 설정 =====
 let font;
 let centers = [];
 
@@ -39,7 +37,7 @@ let perCharColor = false;
 let shapeMode = "Circle";
 let drawMode = "Stroke";
 
-// 🔹 전체 컬러 오퍼시티
+// 전체 컬러 오퍼시티
 let rippleAlpha = 255; // 0~255
 
 // 블렌딩 모드
@@ -67,6 +65,7 @@ let panelVisible = true;
 // 텍스트 입력
 let textArea;
 let exportButton;
+let exportSvgButton; // ✅ SVG 버튼 추가
 
 // 레이아웃 UI
 let layoutSelect;
@@ -90,7 +89,7 @@ let drawModeSelect;
 let blendModeSelect;
 let timelineSlider;
 
-// ===== Auto scale (Size 줄일 때 세팅 자동 리스케일) =====
+// ===== Auto scale =====
 const BASE_SIZE = 800;
 const BASE_RADIUS_MIN = 13;
 const BASE_RADIUS_MAX = 90;
@@ -98,14 +97,13 @@ const BASE_STEP = 20;
 const BASE_SPACING = 70;
 const BASE_STROKEW = 1.5;
 
-// ✅ Tracking/Leading도 autoscale 기준값으로 고정
+// Tracking/Leading 기준값
 const BASE_TRACKING = 40;
 const BASE_LEADING = 80;
 
 let autoScaleOn = true;
 let autoScaleCheckbox;
 
-// ✅ autoscale이 tracking/leading까지 건드릴 때, 사용자가 수동 조절한 값을 기억하기 위한 플래그
 let userTouchedTracking = false;
 let userTouchedLeading = false;
 
@@ -143,16 +141,26 @@ function setup() {
   panelDiv.style("position", "absolute");
   panelDiv.style("z-index", "10");
 
-  // ===== Save 버튼 =====
+  // ===== Export 버튼 Row =====
   let exportRow = createDiv();
   exportRow.parent(panelDiv);
   exportRow.style("margin-bottom", "8px");
+  exportRow.style("display", "flex");
+  exportRow.style("gap", "8px");
+  exportRow.style("align-items", "center");
 
   exportButton = createButton("Save");
   exportButton.parent(exportRow);
   exportButton.mousePressed(exportPNG);
   exportButton.style("font-size", "11px");
   exportButton.style("padding", "4px 8px");
+
+  // ✅ SVG 버튼 추가 (Save 옆)
+  exportSvgButton = createButton("SVG");
+  exportSvgButton.parent(exportRow);
+  exportSvgButton.mousePressed(exportSVG);
+  exportSvgButton.style("font-size", "11px");
+  exportSvgButton.style("padding", "4px 8px");
 
   // ===================== TEXT SECTION =====================
   let layoutTitle = createDiv("Text");
@@ -166,7 +174,7 @@ function setup() {
   layoutBodyDiv.parent(panelDiv);
   layoutBodyDiv.style("margin-top", "8px");
 
-  // 🔤 텍스트 입력창
+  // 텍스트 입력창
   let textRow = createDiv();
   textRow.parent(layoutBodyDiv);
   textRow.style("margin-bottom", "8px");
@@ -186,7 +194,7 @@ function setup() {
   // 사이즈
   textSizeRow = createSliderRow(
     "Size",
-    50, 800,
+    50, 1200,
     textSizeVal,
     v => {
       textSizeVal = v;
@@ -195,7 +203,6 @@ function setup() {
     layoutBodyDiv
   );
 
-  // Size 슬라이더 input 보강
   textSizeRow.slider.input(() => {
     textSizeVal = textSizeRow.slider.value();
     textSizeRow.numberInput.value(textSizeVal);
@@ -210,7 +217,7 @@ function setup() {
     letterSpacingVal,
     v => {
       letterSpacingVal = v;
-      userTouchedTracking = true; // ✅ 사용자가 직접 만졌다고 표시
+      userTouchedTracking = true;
     },
     layoutBodyDiv
   );
@@ -222,12 +229,12 @@ function setup() {
     lineLeadingVal,
     v => {
       lineLeadingVal = v;
-      userTouchedLeading = true; // ✅ 사용자가 직접 만졌다고 표시
+      userTouchedLeading = true;
     },
     layoutBodyDiv
   );
 
-  // ✅ AutoScale 토글 UI
+  // AutoScale 토글 UI
   let autoRow = createDiv();
   autoRow.parent(layoutBodyDiv);
   autoRow.style("margin-top", "6px");
@@ -242,7 +249,6 @@ function setup() {
   autoScaleCheckbox.changed(() => {
     autoScaleOn = autoScaleCheckbox.checked();
     if (autoScaleOn) {
-      // autoscale 켜면 다시 기준 스케일 적용
       userTouchedTracking = false;
       userTouchedLeading = false;
       autoScaleByTextSize();
@@ -305,7 +311,7 @@ function setup() {
   spacingRow   = createSliderRow("Point", 6, 250, spacing, v => spacing = v, styleBodyDiv);
   strokeWRow   = createSliderRow("Stroke", 0.5, 8, strokeW, v => strokeW = v, styleBodyDiv);
 
-  // 🔹 Alpha 슬라이더
+  // Alpha 슬라이더
   alphaRow = createSliderRow(
     "Alpha",
     0, 255,
@@ -323,7 +329,7 @@ function setup() {
     0.001
   );
 
-  // ===== Anim Mode =====
+  // Anim Mode
   let animRow = createDiv();
   animRow.parent(styleBodyDiv);
   animRow.style("margin-top", "6px");
@@ -345,7 +351,7 @@ function setup() {
     pingForward = true;
   });
 
-  // ===== Timeline =====
+  // Timeline
   let tlRow = createDiv();
   tlRow.parent(styleBodyDiv);
   tlRow.style("margin-top", "6px");
@@ -366,7 +372,7 @@ function setup() {
     animSelect.value("Manual");
   });
 
-  // ===== Color Palette =====
+  // Color Palette
   let paletteRow = createDiv();
   paletteRow.parent(styleBodyDiv);
   paletteRow.style("margin-top", "6px");
@@ -382,7 +388,7 @@ function setup() {
   paletteSelect.value(colorPalette);
   paletteSelect.changed(() => colorPalette = paletteSelect.value());
 
-  // 🔘 Filter 체크 (Blur / Noise)
+  // Filter 체크 (Blur / Noise)
   let filterRow = createDiv();
   filterRow.parent(styleBodyDiv);
   filterRow.style("margin-top", "4px");
@@ -401,7 +407,7 @@ function setup() {
   noiseCheckbox.parent(filterRow);
   noiseCheckbox.changed(() => noiseOn = noiseCheckbox.checked());
 
-  // ===== Shape =====
+  // Shape
   let shapeRow = createDiv();
   shapeRow.parent(styleBodyDiv);
   shapeRow.style("margin-top", "4px");
@@ -417,7 +423,7 @@ function setup() {
   shapeSelect.value(shapeMode);
   shapeSelect.changed(() => shapeMode = shapeSelect.value());
 
-  // ===== Draw Mode =====
+  // Draw Mode
   let drawRow = createDiv();
   drawRow.parent(styleBodyDiv);
   drawRow.style("margin-top", "4px");
@@ -433,7 +439,7 @@ function setup() {
   drawModeSelect.value(drawMode);
   drawModeSelect.changed(() => drawMode = drawModeSelect.value());
 
-  // ===== Blend Mode =====
+  // Blend Mode
   let blendRow = createDiv();
   blendRow.parent(styleBodyDiv);
   blendRow.style("margin-top", "4px");
@@ -449,7 +455,7 @@ function setup() {
   blendModeSelect.value(blendModeName);
   blendModeSelect.changed(() => blendModeName = blendModeSelect.value());
 
-  // ===== BG Color =====
+  // BG Color
   let bgRow = createDiv();
   bgRow.parent(styleBodyDiv);
   bgRow.style("margin-top", "4px");
@@ -463,7 +469,7 @@ function setup() {
   bgPicker.parent(bgRow);
   bgPicker.input(() => bgColor = bgPicker.color());
 
-  // ===== Direction =====
+  // Direction
   let dirRow = createDiv();
   dirRow.parent(styleBodyDiv);
   dirRow.style("margin-top", "4px");
@@ -480,7 +486,7 @@ function setup() {
   directionSelect.value(rippleDirection);
   directionSelect.changed(() => rippleDirection = directionSelect.value());
 
-  // ===== Per-char =====
+  // Per-char
   let perCharRow = createDiv();
   perCharRow.parent(styleBodyDiv);
   perCharRow.style("margin-top", "4px");
@@ -494,7 +500,7 @@ function setup() {
   perCharCheckbox.parent(perCharRow);
   perCharCheckbox.changed(() => perCharColor = perCharCheckbox.checked());
 
-  // ===== Easing =====
+  // Easing
   let easingRow = createDiv();
   easingRow.parent(styleBodyDiv);
   easingRow.style("margin-top", "4px");
@@ -510,10 +516,7 @@ function setup() {
   easingSelect.value(easingMode);
   easingSelect.changed(() => easingMode = easingSelect.value());
 
-  // ✅ 시작 시 1회 적용해서 default 형태 고정
   if (autoScaleOn) autoScaleByTextSize();
-
-  // 초기 텍스트 빌드
   buildAllText();
 }
 
@@ -543,7 +546,6 @@ function renderScene(bgCol) {
   blendMode(modeConst);
 
   let eased = applyEasing(rippleProgress, easingMode);
-
   for (let c of centers) drawRipple(c, eased);
 }
 
@@ -645,7 +647,7 @@ function createSliderRow(labelText, min, max, initialValue, onChange, parentDiv,
   return { slider, numberInput };
 }
 
-// ===== Size 기반 자동 리스케일 (✅ Tracking 깨짐 해결 버전) =====
+// ===== Size 기반 자동 리스케일 =====
 function autoScaleByTextSize() {
   let s = textSizeVal / BASE_SIZE;
 
@@ -655,19 +657,15 @@ function autoScaleByTextSize() {
   spacing   = max(6, round(BASE_SPACING * s));
   strokeW   = max(0.5, BASE_STROKEW * s);
 
-  // ✅ autoscale ON일 때: tracking/leading도 같이 비율로 따라가게
-  // (단, 사용자가 Tracking/Leading 슬라이더를 직접 만졌으면 그 값은 존중)
   if (!userTouchedTracking) letterSpacingVal = round(BASE_TRACKING * s);
   if (!userTouchedLeading)  lineLeadingVal   = round(BASE_LEADING * s);
 
-  // UI 반영
   if (radiusMinRow) { radiusMinRow.slider.value(radiusMin); radiusMinRow.numberInput.value(radiusMin); }
   if (radiusMaxRow) { radiusMaxRow.slider.value(radiusMax); radiusMaxRow.numberInput.value(radiusMax); }
   if (stepRow)      { stepRow.slider.value(step);           stepRow.numberInput.value(step); }
   if (spacingRow)   { spacingRow.slider.value(spacing);     spacingRow.numberInput.value(spacing); }
   if (strokeWRow)   { strokeWRow.slider.value(strokeW);     strokeWRow.numberInput.value(strokeW); }
 
-  // ✅ tracking/leading UI도 같이 업데이트
   if (letterSpacingRow) { letterSpacingRow.slider.value(letterSpacingVal); letterSpacingRow.numberInput.value(letterSpacingVal); }
   if (leadingRow)       { leadingRow.slider.value(lineLeadingVal);         leadingRow.numberInput.value(lineLeadingVal); }
 }
@@ -680,14 +678,13 @@ function buildAllText() {
   centerAlignCenters();
 }
 
-// 🔧 블록 레이아웃 (글자별 로컬 그리드)
+// 블록 레이아웃
 function buildBlockText() {
   let fontSize = textSizeVal;
   let lines = textContent.toUpperCase().split("\n");
   let allCenters = [];
   let glyphCounter = 0;
 
-  // ✅ textWidth 안정화 (루프 밖에서 1번)
   textFont(font);
   textSize(fontSize);
 
@@ -699,7 +696,6 @@ function buildBlockText() {
     for (let i = 0; i < line.length; i++) {
       let ch = line[i];
 
-      // ✅ 스페이스도 font 기반 advance로
       if (ch === " ") {
         cursorX += textWidth(" ") + letterSpacingVal;
         glyphCounter++;
@@ -712,22 +708,53 @@ function buildBlockText() {
       let originX = cursorX;
       let originY = cursorY;
 
+      let snappedPts = [];
+      let minLX = Infinity, maxLX = -Infinity;
+
       for (let p of info.pts) {
-        let gx = p.x + cursorX;
-        let gy = p.y + cursorY;
-        addSnappedPoint(allCenters, gx, gy, glyphCounter, originX, originY);
+        let sx = Math.round(p.x / spacing) * spacing;
+        let sy = Math.round(p.y / spacing) * spacing;
+
+        snappedPts.push({ x: sx, y: sy });
+
+        if (sx < minLX) minLX = sx;
+        if (sx > maxLX) maxLX = sx;
       }
 
-      // advance width(textWidth) + Tracking
-      let adv = textWidth(ch);
+      if (!snappedPts.length) {
+        glyphCounter++;
+        continue;
+      }
+
+      let shiftX = -minLX;
+
+      for (let sp of snappedPts) {
+        let gx = originX + sp.x + shiftX;
+        let gy = originY + sp.y;
+        addSnappedPointWorld(allCenters, gx, gy, glyphCounter);
+      }
+
+      let snappedW = (maxLX > minLX) ? (maxLX - minLX) : 0;
+      let adv = Math.max(textWidth(ch), snappedW);
+
       cursorX += adv + letterSpacingVal;
       glyphCounter++;
     }
   }
+
   centers = allCenters;
 }
 
-// 🔧 원형 / 아치 레이아웃
+function addSnappedPointWorld(allCenters, sx, sy, gIndex) {
+  for (let q of allCenters) {
+    if (q.gIndex === gIndex && dist(sx, sy, q.x, q.y) < spacing * 0.4) return;
+  }
+  let v = createVector(sx, sy);
+  v.gIndex = gIndex;
+  allCenters.push(v);
+}
+
+// 원형 / 아치 레이아웃
 function buildRadialText() {
   let fontSize = textSizeVal;
   let textFlat = textContent.toUpperCase().replace(/\n/g, " ");
@@ -774,7 +801,6 @@ function buildRadialText() {
   centers = allCenters;
 }
 
-// 🔧 스냅 + 중복 제거 + gIndex 지정
 function addSnappedPoint(allCenters, gx, gy, gIndex, originX, originY) {
   let localX = gx - originX;
   let localY = gy - originY;
@@ -794,7 +820,6 @@ function addSnappedPoint(allCenters, gx, gy, gIndex, originX, originY) {
   allCenters.push(v);
 }
 
-// 글자 하나의 점들 (오리지널 형태 유지)
 function getGlyphPoints(ch, fontSize) {
   let bounds = font.textBounds(ch, 0, 0, fontSize);
   if (!bounds) return null;
@@ -829,7 +854,7 @@ function centerAlignCenters() {
   }
 }
 
-// ===== Ripple 그리기 =====
+// ===== Ripple 그리기 (기본 캔버스용) =====
 function drawRipple(pt, progress) {
   let cx = pt.x;
   let cy = pt.y;
@@ -869,6 +894,52 @@ function drawRipple(pt, progress) {
     } else if (shapeMode === "Dot") {
       let dotSize = step * 0.4;
       ellipse(cx + r * 0.3, cy, dotSize, dotSize);
+    }
+  }
+}
+
+// ===== SVG Export 전용: p5.Graphics(SVG)에 그리기 =====
+// 참고: SVG에서는 blur/noise 같은 픽셀 필터는 동일하게 재현이 어렵고,
+// 용량도 커지기 쉬워서 SVG 저장에서는 의도적으로 제외했어.
+function drawRippleTo(pg, pt, progress) {
+  let cx = pt.x;
+  let cy = pt.y;
+  let gIndex = pt.gIndex || 0;
+
+  for (let r = radiusMin; r <= radiusMax; r += step) {
+    let t = (r - radiusMin) / (radiusMax - radiusMin);
+
+    let visible = (rippleDirection === "Inside-Out") ? t <= progress : t >= 1 - progress;
+    if (!visible) continue;
+
+    let col = getColorForRipple(t, r, gIndex);
+    let alpha = rippleAlpha;
+
+    let forceStroke = (shapeMode === "LineX" || shapeMode === "LineY");
+
+    if (drawMode === "Fill" && !forceStroke) {
+      pg.noStroke();
+      pg.fill(col[0], col[1], col[2], alpha);
+    } else {
+      pg.noFill();
+      pg.stroke(col[0], col[1], col[2], alpha);
+      pg.strokeWeight(strokeW);
+    }
+
+    if (shapeMode === "Circle") {
+      pg.ellipse(cx, cy, r * 2, r * 2);
+    } else if (shapeMode === "LineX") {
+      pg.line(cx - r, cy, cx + r, cy);
+    } else if (shapeMode === "LineY") {
+      pg.line(cx, cy - r, cx, cy + r);
+    } else if (shapeMode === "Rect") {
+      pg.rectMode(CENTER);
+      pg.rect(cx, cy, r * 2, r * 2);
+    } else if (shapeMode === "Triangle") {
+      pg.triangle(cx, cy - r, cx - r, cy + r, cx + r, cy + r);
+    } else if (shapeMode === "Dot") {
+      let dotSize = step * 0.4;
+      pg.ellipse(cx + r * 0.3, cy, dotSize, dotSize);
     }
   }
 }
@@ -960,7 +1031,7 @@ function keyPressed() {
   }
 }
 
-// ===== Export (투명 배경으로 타입만) =====
+// ===== Export PNG (투명 배경) =====
 function exportPNG() {
   let prevBg = bgColor;
 
@@ -983,6 +1054,124 @@ function exportPNG() {
   saveCanvas(canvas, "type_ripple", "png");
 
   renderScene(prevBg);
+}
+
+// ===== ✅ Export SVG (벡터, 안 깨짐) =====
+function exportSVG() {
+  const svgText = buildSVGString();
+  downloadTextAsFile(svgText, "type_ripple.svg", "image/svg+xml;charset=utf-8");
+}
+
+// ===== SVG 문자열 생성 (벡터) =====
+function buildSVGString() {
+  const w = width;
+  const h = height;
+
+  const eased = applyEasing(rippleProgress, easingMode);
+
+  // SVG 헤더 (투명 배경)
+  let parts = [];
+  parts.push(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" shape-rendering="geometricPrecision">`
+  );
+
+  // 블렌드/필터(blur/noise)는 SVG에서 동일 재현 어려워서 export에서는 제외
+  // 배경색 포함하고 싶으면 아래 주석 해제:
+  // const bg = bgColor;
+  // parts.push(`<rect x="0" y="0" width="${w}" height="${h}" fill="${rgbToHex(red(bg), green(bg), blue(bg))}" />`);
+
+  // 도형들
+  for (let c of centers) {
+    parts.push(...rippleToSVGElements(c, eased));
+  }
+
+  parts.push(`</svg>`);
+  return parts.join("");
+}
+
+function rippleToSVGElements(pt, progress) {
+  const cx = pt.x;
+  const cy = pt.y;
+  const gIndex = pt.gIndex || 0;
+
+  let els = [];
+
+  for (let r = radiusMin; r <= radiusMax; r += step) {
+    const t = (r - radiusMin) / (radiusMax - radiusMin);
+    const visible = (rippleDirection === "Inside-Out") ? t <= progress : t >= 1 - progress;
+    if (!visible) continue;
+
+    const col = getColorForRipple(t, r, gIndex);
+    const a = constrain(rippleAlpha, 0, 255) / 255;
+
+    const forceStroke = (shapeMode === "LineX" || shapeMode === "LineY");
+    const useFill = (drawMode === "Fill" && !forceStroke);
+
+    const strokeHex = rgbToHex(col[0], col[1], col[2]);
+    const fillHex = strokeHex;
+
+    const strokeAttr = useFill
+      ? `stroke="none"`
+      : `fill="none" stroke="${strokeHex}" stroke-opacity="${a}" stroke-width="${strokeW}" vector-effect="non-scaling-stroke"`;
+
+    const fillAttr = useFill
+      ? `fill="${fillHex}" fill-opacity="${a}"`
+      : `fill="none"`;
+
+    if (shapeMode === "Circle") {
+      els.push(`<circle cx="${cx}" cy="${cy}" r="${r}" ${useFill ? fillAttr : strokeAttr} />`);
+    } else if (shapeMode === "LineX") {
+      els.push(`<line x1="${cx - r}" y1="${cy}" x2="${cx + r}" y2="${cy}" ${strokeAttr} />`);
+    } else if (shapeMode === "LineY") {
+      els.push(`<line x1="${cx}" y1="${cy - r}" x2="${cx}" y2="${cy + r}" ${strokeAttr} />`);
+    } else if (shapeMode === "Rect") {
+      const x = cx - r;
+      const y = cy - r;
+      const s = r * 2;
+      els.push(`<rect x="${x}" y="${y}" width="${s}" height="${s}" ${useFill ? fillAttr : strokeAttr} />`);
+    } else if (shapeMode === "Triangle") {
+      const p1 = `${cx},${cy - r}`;
+      const p2 = `${cx - r},${cy + r}`;
+      const p3 = `${cx + r},${cy + r}`;
+      els.push(`<polygon points="${p1} ${p2} ${p3}" ${useFill ? fillAttr : strokeAttr} />`);
+    } else if (shapeMode === "Dot") {
+      const dotSize = step * 0.4;
+      const dx = cx + r * 0.3;
+      const rr = dotSize / 2;
+      // Dot은 fill이 자연스럽게 보이게 처리
+      els.push(`<circle cx="${dx}" cy="${cy}" r="${rr}" fill="${fillHex}" fill-opacity="${a}" stroke="none" />`);
+    }
+  }
+
+  return els;
+}
+
+// ===== 다운로드 유틸 =====
+function downloadTextAsFile(text, filename, mime) {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 0);
+}
+
+// ===== 색 유틸 =====
+function rgbToHex(r, g, b) {
+  const rr = clamp255(Math.round(r));
+  const gg = clamp255(Math.round(g));
+  const bb = clamp255(Math.round(b));
+  return "#" + [rr, gg, bb].map(v => v.toString(16).padStart(2, "0")).join("");
+}
+function clamp255(v) {
+  return Math.max(0, Math.min(255, v));
 }
 
 // ===== 리사이즈 대응 =====
